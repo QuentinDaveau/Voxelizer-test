@@ -1,0 +1,54 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=4
+
+_global_script_classes=[ {
+"base": "ImmediateGeometry",
+"class": "BoxDrawer",
+"language": "GDScript",
+"path": "res://Voxelizer/box_drawer.gd"
+}, {
+"base": "Reference",
+"class": "Raycaster",
+"language": "GDScript",
+"path": "res://raycaster.gd"
+}, {
+"base": "Node",
+"class": "TriangulationTable",
+"language": "GDScript",
+"path": "res://Voxelizer/mc_triangulation_table.gd"
+}, {
+"base": "Spatial",
+"class": "Voxelizer",
+"language": "GDScript",
+"path": "res://Voxelizer/voxelizer.gd"
+} ]
+_global_script_class_icons={
+"BoxDrawer": "",
+"Raycaster": "",
+"TriangulationTable": "",
+"Voxelizer": ""
+}
+
+[application]
+
+config/name="Voxelization Test"
+config/icon="res://icon.png"
+
+[autoload]
+
+DebugOverlay="*res://Debug/DebugOverlay.tscn"
+
+[physics]
+
+common/enable_pause_aware_picking=true
+
+[rendering]
+
+environment/default_environment="res://default_env.tres"
