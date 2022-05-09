@@ -144,7 +144,7 @@ class Voxel:
 	
 	
 	func collides() -> bool:
-		return _edges != 0
+		return _corners != 0
 	
 	
 	
@@ -197,23 +197,35 @@ class Voxel:
 			_center + Vector3(-1, +1, +1) * offset,
 		]
 		
-		# Testing the 12 edges
-		_edges = 0
+		# Testing the 8 corners
 		
-		_edges += _test_edge(corners[0], corners[1], raycaster) * 1 << 0
-		_edges += _test_edge(corners[1], corners[2], raycaster) * 1 << 1
-		_edges += _test_edge(corners[2], corners[3], raycaster) * 1 << 2
-		_edges += _test_edge(corners[3], corners[0], raycaster) * 1 << 3
-		_edges += _test_edge(corners[0], corners[4], raycaster) * 1 << 4
-		_edges += _test_edge(corners[1], corners[5], raycaster) * 1 << 5
-		_edges += _test_edge(corners[2], corners[6], raycaster) * 1 << 6
-		_edges += _test_edge(corners[3], corners[7], raycaster) * 1 << 7
-		_edges += _test_edge(corners[4], corners[5], raycaster) * 1 << 8
-		_edges += _test_edge(corners[5], corners[6], raycaster) * 1 << 9
-		_edges += _test_edge(corners[6], corners[7], raycaster) * 1 << 10
-		_edges += _test_edge(corners[7], corners[0], raycaster) * 1 << 11
-		
-		_generate_corners()
+		_corners = 0
+		_corners += _test_edge(_center, corners[0], raycaster) * 1 << 0
+		_corners += _test_edge(_center, corners[1], raycaster) * 1 << 1
+		_corners += _test_edge(_center, corners[2], raycaster) * 1 << 2
+		_corners += _test_edge(_center, corners[3], raycaster) * 1 << 3
+		_corners += _test_edge(_center, corners[4], raycaster) * 1 << 4
+		_corners += _test_edge(_center, corners[5], raycaster) * 1 << 5
+		_corners += _test_edge(_center, corners[6], raycaster) * 1 << 6
+		_corners += _test_edge(_center, corners[7], raycaster) * 1 << 7
+#
+#		# Testing the 12 edges
+#		_edges = 0
+#
+#		_edges += _test_edge(corners[0], corners[1], raycaster) * 1 << 0
+#		_edges += _test_edge(corners[1], corners[2], raycaster) * 1 << 1
+#		_edges += _test_edge(corners[2], corners[3], raycaster) * 1 << 2
+#		_edges += _test_edge(corners[3], corners[0], raycaster) * 1 << 3
+#		_edges += _test_edge(corners[0], corners[4], raycaster) * 1 << 4
+#		_edges += _test_edge(corners[1], corners[5], raycaster) * 1 << 5
+#		_edges += _test_edge(corners[2], corners[6], raycaster) * 1 << 6
+#		_edges += _test_edge(corners[3], corners[7], raycaster) * 1 << 7
+#		_edges += _test_edge(corners[4], corners[5], raycaster) * 1 << 8
+#		_edges += _test_edge(corners[5], corners[6], raycaster) * 1 << 9
+#		_edges += _test_edge(corners[6], corners[7], raycaster) * 1 << 10
+#		_edges += _test_edge(corners[7], corners[0], raycaster) * 1 << 11
+#
+#		_generate_corners()
 	
 	
 	
@@ -228,7 +240,7 @@ class Voxel:
 	
 	
 	func _test_edge(a: Vector3, b: Vector3, caster: Raycaster) -> int:
-		var collides := caster.collides(a, b)
+		var collides := caster.collides(b, a)
 		# Testing both ways for single-side collision
-		return 1 if collides or caster.collides(b, a) else 0
+		return 1 if collides or caster.collides(a, b) else 0
 

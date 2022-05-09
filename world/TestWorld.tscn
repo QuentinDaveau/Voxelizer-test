@@ -1398,6 +1398,11 @@ transform = Transform( 7.01, 0, 0, 0, -2.20305e-07, 1.5, 0, -5.04, -6.55671e-08,
 mesh = SubResource( 96 )
 skeleton = NodePath("../../..")
 
+[node name="Block22" parent="Geometry/Structures" instance=ExtResource( 1 )]
+transform = Transform( 2, 0, 0, 0, -8.74228e-08, 2, 0, -2, -8.74228e-08, -4.05802, 4.62183, 14.1508 )
+mesh = SubResource( 96 )
+skeleton = NodePath("../../..")
+
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource( 33 )
 
@@ -1406,9 +1411,10 @@ transform = Transform( 0.892979, 0.101771, 0.438442, -0.444396, 0.353917, 0.8229
 shadow_enabled = true
 
 [node name="Old_snag" parent="." instance=ExtResource( 5 )]
-transform = Transform( 10, 0, 0, 0, 10, 0, 0, 0, 10, -16.829, 2.918, 18.294 )
+transform = Transform( 10, 0, 0, 0, 10, 0, 0, 0, 10, -17.4611, 2.918, 18.294 )
+visible = false
 
 [node name="Voxelizer" type="Spatial" parent="."]
 script = ExtResource( 3 )
 voxelization_box = AABB( -21.856, 0.779, 9.737, 10, 10, 10 )
-voxel_size = 1.0
+voxel_size = 0.5
