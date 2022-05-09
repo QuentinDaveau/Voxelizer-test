@@ -109,6 +109,10 @@ func _generate_meshes() -> void:
 					continue
 				vertices.append_array(voxel.get_corresponding_vertices())
 	
+	# Swapping the mesh normals
+#	vertices.invert()
+	
+	
 	var arr_mesh = ArrayMesh.new()
 	var arrays = []
 	arrays.resize(ArrayMesh.ARRAY_MAX)
@@ -155,29 +159,47 @@ class Voxel:
 	
 	func get_corresponding_vertices() -> PoolVector3Array:
 		var offset := _size / 2.0
-		var corners: PoolVector3Array = [
-			_center + Vector3(-1, -1, -1) * offset,
-			_center + Vector3(+1, -1, -1) * offset,
-			_center + Vector3(+1, -1, +1) * offset,
-			_center + Vector3(-1, -1, +1) * offset,
-			_center + Vector3(-1, +1, -1) * offset,
-			_center + Vector3(+1, +1, -1) * offset,
-			_center + Vector3(+1, +1, +1) * offset,
-			_center + Vector3(-1, +1, +1) * offset,
-		]
 		var vertices: PoolVector3Array = []
+		
+		# Simplified version
+#		var corners: PoolVector3Array = [
+#			_center + Vector3(-1, -1, -1) * offset,
+#			_center + Vector3(+1, -1, -1) * offset,
+#			_center + Vector3(+1, -1, +1) * offset,
+#			_center + Vector3(-1, -1, +1) * offset,
+#			_center + Vector3(-1, +1, -1) * offset,
+#			_center + Vector3(+1, +1, -1) * offset,
+#			_center + Vector3(+1, +1, +1) * offset,
+#			_center + Vector3(-1, +1, +1) * offset,
+#		]
+#		var vert_indexes: Array = TriangulationTable.MC[_corners]
+#
+#		for index in vert_indexes:
+#			if index == -1:
+#				continue
+#			vertices.append(corners[index])
+		
+		# Complex version
+		var edges: PoolVector3Array = [
+			_center + Vector3(-1, -1, 0) * offset,
+			_center + Vector3(0, -1, +1) * offset,
+			_center + Vector3(+1, -1, 0) * offset,
+			_center + Vector3(0, -1, -1) * offset,
+			_center + Vector3(-1, +1, 0) * offset,
+			_center + Vector3(0, +1, +1) * offset,
+			_center + Vector3(+1, +1, 0) * offset,
+			_center + Vector3(0, +1, -1) * offset,
+			_center + Vector3(-1, 0, -1) * offset,
+			_center + Vector3(-1, 0, +1) * offset,
+			_center + Vector3(+1, 0, +1) * offset,
+			_center + Vector3(+1, 0, -1) * offset,
+		]
+		
 		var vert_indexes: Array = TriangulationTable.MC[_corners]
-		
-		# Extra step to change the vert rotation
-#		for i in range(0, vert_indexes.size(), 3):
-#			var v: int = vert_indexes[i]
-#			vert_indexes[i] = vert_indexes[i + 2]
-#			vert_indexes[i + 2] = v
-		
 		for index in vert_indexes:
 			if index == -1:
 				continue
-			vertices.append(corners[index])
+			vertices.append(edges[index])
 		
 		return vertices
 	
@@ -188,26 +210,42 @@ class Voxel:
 		var offset := _size / 2.0
 		var corners: PoolVector3Array = [
 			_center + Vector3(-1, -1, -1) * offset,
-			_center + Vector3(+1, -1, -1) * offset,
-			_center + Vector3(+1, -1, +1) * offset,
 			_center + Vector3(-1, -1, +1) * offset,
+			_center + Vector3(+1, -1, +1) * offset,
+			_center + Vector3(+1, -1, -1) * offset,
 			_center + Vector3(-1, +1, -1) * offset,
-			_center + Vector3(+1, +1, -1) * offset,
-			_center + Vector3(+1, +1, +1) * offset,
 			_center + Vector3(-1, +1, +1) * offset,
+			_center + Vector3(+1, +1, +1) * offset,
+			_center + Vector3(+1, +1, -1) * offset,
 		]
 		
 		# Testing the 8 corners
 		
 		_corners = 0
-		_corners += _test_edge(_center, corners[0], raycaster) * 1 << 0
-		_corners += _test_edge(_center, corners[1], raycaster) * 1 << 1
-		_corners += _test_edge(_center, corners[2], raycaster) * 1 << 2
-		_corners += _test_edge(_center, corners[3], raycaster) * 1 << 3
-		_corners += _test_edge(_center, corners[4], raycaster) * 1 << 4
-		_corners += _test_edge(_center, corners[5], raycaster) * 1 << 5
-		_corners += _test_edge(_center, corners[6], raycaster) * 1 << 6
-		_corners += _test_edge(_center, corners[7], raycaster) * 1 << 7
+		_corners |= _test_edge(corners[0], corners[1], raycaster) * 1 << 0
+		_corners |= _test_edge(corners[0], corners[3], raycaster) * 1 << 0
+		_corners |= _test_edge(corners[0], corners[4], raycaster) * 1 << 0
+		_corners |= _test_edge(corners[1], corners[2], raycaster) * 1 << 1
+		_corners |= _test_edge(corners[1], corners[5], raycaster) * 1 << 1
+		_corners |= _test_edge(corners[1], corners[0], raycaster) * 1 << 1
+		_corners |= _test_edge(corners[2], corners[3], raycaster) * 1 << 2
+		_corners |= _test_edge(corners[2], corners[6], raycaster) * 1 << 2
+		_corners |= _test_edge(corners[2], corners[1], raycaster) * 1 << 2
+		_corners |= _test_edge(corners[3], corners[0], raycaster) * 1 << 3
+		_corners |= _test_edge(corners[3], corners[7], raycaster) * 1 << 3
+		_corners |= _test_edge(corners[3], corners[2], raycaster) * 1 << 3
+		_corners |= _test_edge(corners[4], corners[0], raycaster) * 1 << 4
+		_corners |= _test_edge(corners[4], corners[7], raycaster) * 1 << 4
+		_corners |= _test_edge(corners[4], corners[5], raycaster) * 1 << 4
+		_corners |= _test_edge(corners[5], corners[4], raycaster) * 1 << 5
+		_corners |= _test_edge(corners[5], corners[1], raycaster) * 1 << 5
+		_corners |= _test_edge(corners[5], corners[6], raycaster) * 1 << 5
+		_corners |= _test_edge(corners[6], corners[7], raycaster) * 1 << 6
+		_corners |= _test_edge(corners[6], corners[2], raycaster) * 1 << 6
+		_corners |= _test_edge(corners[6], corners[5], raycaster) * 1 << 6
+		_corners |= _test_edge(corners[7], corners[4], raycaster) * 1 << 7
+		_corners |= _test_edge(corners[7], corners[3], raycaster) * 1 << 7
+		_corners |= _test_edge(corners[7], corners[6], raycaster) * 1 << 7
 #
 #		# Testing the 12 edges
 #		_edges = 0
@@ -242,5 +280,5 @@ class Voxel:
 	func _test_edge(a: Vector3, b: Vector3, caster: Raycaster) -> int:
 		var collides := caster.collides(b, a)
 		# Testing both ways for single-side collision
-		return 1 if collides or caster.collides(a, b) else 0
+		return 1 if collides else 0
 
