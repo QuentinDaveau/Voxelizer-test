@@ -1402,7 +1402,7 @@ mesh = SubResource( 96 )
 skeleton = NodePath("../../..")
 
 [node name="Block22" parent="." instance=ExtResource( 1 )]
-transform = Transform( 1.54996, 5.52502e-08, -1.26398, 1.26398, -6.77507e-08, 1.54996, 0, -2, -8.74228e-08, -15.9894, 4.62183, 14.1508 )
+transform = Transform( 2.00001, 0, 0, 0, 1.41421, -1.41422, 0, 1.41421, 1.41422, -27.6471, 6.0661, 13.9292 )
 visible = false
 mesh = SubResource( 96 )
 
@@ -1418,7 +1418,9 @@ transform = Transform( 10, 0, 0, 0, 10, 0, 0, 0, 10, -31.2599, 2.918, 18.294 )
 visible = false
 
 [node name="StaticBody" type="StaticBody" parent="."]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -31.2156, 4.83411, 14.1517 )
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -16.321, 5.21889, 15.7347 )
+collision_layer = 3
+collision_mask = 3
 
 [node name="CollisionShape" type="CollisionShape" parent="StaticBody"]
 shape = SubResource( 97 )
@@ -1426,4 +1428,4 @@ shape = SubResource( 97 )
 [node name="Voxelizer" type="Spatial" parent="."]
 script = ExtResource( 3 )
 voxelization_box = AABB( -21.87, 0.779, 9.737, 10, 10, 10 )
-voxel_size = 0.5
+voxel_size = 1.01

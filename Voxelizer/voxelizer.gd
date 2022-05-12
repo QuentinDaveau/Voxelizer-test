@@ -10,7 +10,9 @@ export(bool) var bake = false setget bake
 
 var _drawer: BoxDrawer
 var _markers: MeshInstance
+var _corners: MeshInstance
 onready var _thread: Thread = Thread.new()
+onready var _caster: Raycaster = Raycaster.new(get_world())
 
 var _voxels: Array
 
@@ -24,6 +26,8 @@ func _ready() -> void:
 	_drawer.draw_aabb(voxelization_box, global_transform.origin, Color.red)
 	_markers = MeshInstance.new()
 	add_child(_markers)
+	_corners = MeshInstance.new()
+	add_child(_corners)
 
 
 
@@ -34,6 +38,10 @@ func set_bounding_box(value: AABB) -> void:
 
 
 func bake(value: bool) -> void:
+	_voxels.empty()
+	_markers.mesh = null
+	_corners.mesh = null
+	
 	_thread.start(self, "_generate_voxels")
 
 
@@ -75,26 +83,35 @@ func voxels_done() -> void:
 
 
 
-func _generate_edges() -> int:
-	var caster := Raycaster.new(get_world())
+func _generate_edges() -> void:
 	var i := 0.0
 	var j := 0
 	for x in _voxels:
 		print("Progress: ", (i / _voxels.size()) * 100, " %")
 		for y in x:
 			for voxel in y:
-				voxel.test_edges(caster)
+				voxel.test_edges(_caster)
 				j += 1
 		i += 1
 	call_deferred("_edges_done")
+	
 	print("Tested: ", j, " voxels")
-	return OK
 
 
 
 func _edges_done() -> void:
 	print("Edges done !")
-	var result: int = _thread.wait_to_finish()
+	_thread.wait_to_finish()
+	
+	var j := 0
+	for x in _voxels:
+		for y in x:
+			for voxel in y:
+				if voxel.collides():
+					j += 1
+	
+	print(j, " voxels are colliding !")
+	
 	print("Generating mesh !")
 	_generate_meshes()
 
@@ -120,6 +137,21 @@ func _generate_meshes() -> void:
 	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_markers.mesh = arr_mesh
 	
+	var debug_vertices: PoolVector3Array = []
+	# Generating debug points
+	for x in _voxels:
+		for y in x:
+			for voxel in y:
+				for corner in voxel._corners:
+					debug_vertices.append_array(_generate_point(corner.position, corner.state == 2))
+	
+	var debug_arr_mesh = ArrayMesh.new()
+	var debug_arrays = []
+	debug_arrays.resize(ArrayMesh.ARRAY_MAX)
+	debug_arrays[ArrayMesh.ARRAY_VERTEX] = debug_vertices
+	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, debug_arrays)
+	_corners.mesh = debug_arr_mesh
+	
 #	var multimesh := MultiMesh.new()
 #	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 #	multimesh.set_instance_count(colliding_voxels.size())
@@ -131,15 +163,28 @@ func _generate_meshes() -> void:
 #	for i in range(colliding_voxels.size()):
 #		print("Progress: ", (float(i) / colliding_voxels.size()) * 100, " %")
 #		_markers.multimesh.set_instance_transform(i, Transform(Basis(), colliding_voxels[i]._center - global_transform.origin))
+
+
+
+func _generate_point(center: Vector3, inside: bool = false) -> PoolVector3Array:
+	var points: PoolVector3Array = []
 	
+	var pyramid_top := center + Vector3(0.0, 0.05 * (2.0 if inside else -1.0), 0.0)
+	
+	points.append_array([center + Vector3(0.05, 0.0, 0.05), center + Vector3(-0.05, 0.0, -0.05), center + Vector3(0.05, 0.0, -0.05)])
+	points.append_array([center + Vector3(0.05, 0.0, 0.05), center + Vector3(-0.05, 0.0, -0.05), pyramid_top])
+	points.append_array([pyramid_top, center + Vector3(-0.05, 0.0, -0.05), center + Vector3(0.05, 0.0, -0.05)])
+	points.append_array([center + Vector3(0.05, 0.0, 0.05), pyramid_top, center + Vector3(0.05, 0.0, -0.05)])
+	
+	return points
 
 
 
 class Voxel:
 	var _center: Vector3
 	var _size: float
-	var _edges: int
-	var _corners : int
+	var _edges := []
+	var _corners := []
 	
 	func _init(center: Vector3, size: float) -> void:
 		_center = center
@@ -148,11 +193,14 @@ class Voxel:
 	
 	
 	func collides() -> bool:
-		return _corners != 0
+		for edge in _edges:
+			if edge.is_cut():
+				return true
+		return false
 	
 	
 	
-	func get_corners() -> int:
+	func get_corners() -> Array:
 		return _corners
 	
 	
@@ -195,8 +243,7 @@ class Voxel:
 			_center + Vector3(+1, 0, -1) * offset,
 		]
 		
-		var vert_indexes: Array = TriangulationTable.MC[_corners]
-		for index in vert_indexes:
+		for index in TriangulationTable.MC[_get_corners_index()]:
 			if index == -1:
 				continue
 			vertices.append(edges[index])
@@ -206,79 +253,162 @@ class Voxel:
 	
 	
 	func test_edges(raycaster: Raycaster) -> void:
-#		print("Testing edges !")
 		var offset := _size / 2.0
-		var corners: PoolVector3Array = [
-			_center + Vector3(-1, -1, -1) * offset,
-			_center + Vector3(-1, -1, +1) * offset,
-			_center + Vector3(+1, -1, +1) * offset,
-			_center + Vector3(+1, -1, -1) * offset,
-			_center + Vector3(-1, +1, -1) * offset,
-			_center + Vector3(-1, +1, +1) * offset,
-			_center + Vector3(+1, +1, +1) * offset,
-			_center + Vector3(+1, +1, -1) * offset,
+		_corners = [
+			Corner.new(0, _center + Vector3(-1, -1, -1) * offset),
+			Corner.new(1, _center + Vector3(-1, -1, +1) * offset),
+			Corner.new(2, _center + Vector3(+1, -1, +1) * offset),
+			Corner.new(3, _center + Vector3(+1, -1, -1) * offset),
+			Corner.new(4, _center + Vector3(-1, +1, -1) * offset),
+			Corner.new(5, _center + Vector3(-1, +1, +1) * offset),
+			Corner.new(6, _center + Vector3(+1, +1, +1) * offset),
+			Corner.new(7, _center + Vector3(+1, +1, -1) * offset),
 		]
 		
-		# Testing the 8 corners
+		_edges = [
+			Edge.new(raycaster, _corners[0],  _corners[1]),
+			Edge.new(raycaster, _corners[1],  _corners[2]),
+			Edge.new(raycaster, _corners[2],  _corners[3]),
+			Edge.new(raycaster, _corners[3],  _corners[0]),
+			Edge.new(raycaster, _corners[4],  _corners[5]),
+			Edge.new(raycaster, _corners[5],  _corners[6]),
+			Edge.new(raycaster, _corners[6],  _corners[7]),
+			Edge.new(raycaster, _corners[7],  _corners[4]),
+			Edge.new(raycaster, _corners[0],  _corners[4]),
+			Edge.new(raycaster, _corners[1],  _corners[5]),
+			Edge.new(raycaster, _corners[2],  _corners[6]),
+			Edge.new(raycaster, _corners[3],  _corners[7]),
+		]
 		
-		_corners = 0
-		_corners |= _test_edge(corners[0], corners[1], raycaster) * 1 << 0
-		_corners |= _test_edge(corners[0], corners[3], raycaster) * 1 << 0
-		_corners |= _test_edge(corners[0], corners[4], raycaster) * 1 << 0
-		_corners |= _test_edge(corners[1], corners[2], raycaster) * 1 << 1
-		_corners |= _test_edge(corners[1], corners[5], raycaster) * 1 << 1
-		_corners |= _test_edge(corners[1], corners[0], raycaster) * 1 << 1
-		_corners |= _test_edge(corners[2], corners[3], raycaster) * 1 << 2
-		_corners |= _test_edge(corners[2], corners[6], raycaster) * 1 << 2
-		_corners |= _test_edge(corners[2], corners[1], raycaster) * 1 << 2
-		_corners |= _test_edge(corners[3], corners[0], raycaster) * 1 << 3
-		_corners |= _test_edge(corners[3], corners[7], raycaster) * 1 << 3
-		_corners |= _test_edge(corners[3], corners[2], raycaster) * 1 << 3
-		_corners |= _test_edge(corners[4], corners[0], raycaster) * 1 << 4
-		_corners |= _test_edge(corners[4], corners[7], raycaster) * 1 << 4
-		_corners |= _test_edge(corners[4], corners[5], raycaster) * 1 << 4
-		_corners |= _test_edge(corners[5], corners[4], raycaster) * 1 << 5
-		_corners |= _test_edge(corners[5], corners[1], raycaster) * 1 << 5
-		_corners |= _test_edge(corners[5], corners[6], raycaster) * 1 << 5
-		_corners |= _test_edge(corners[6], corners[7], raycaster) * 1 << 6
-		_corners |= _test_edge(corners[6], corners[2], raycaster) * 1 << 6
-		_corners |= _test_edge(corners[6], corners[5], raycaster) * 1 << 6
-		_corners |= _test_edge(corners[7], corners[4], raycaster) * 1 << 7
-		_corners |= _test_edge(corners[7], corners[3], raycaster) * 1 << 7
-		_corners |= _test_edge(corners[7], corners[6], raycaster) * 1 << 7
-#
-#		# Testing the 12 edges
-#		_edges = 0
-#
-#		_edges += _test_edge(corners[0], corners[1], raycaster) * 1 << 0
-#		_edges += _test_edge(corners[1], corners[2], raycaster) * 1 << 1
-#		_edges += _test_edge(corners[2], corners[3], raycaster) * 1 << 2
-#		_edges += _test_edge(corners[3], corners[0], raycaster) * 1 << 3
-#		_edges += _test_edge(corners[0], corners[4], raycaster) * 1 << 4
-#		_edges += _test_edge(corners[1], corners[5], raycaster) * 1 << 5
-#		_edges += _test_edge(corners[2], corners[6], raycaster) * 1 << 6
-#		_edges += _test_edge(corners[3], corners[7], raycaster) * 1 << 7
-#		_edges += _test_edge(corners[4], corners[5], raycaster) * 1 << 8
-#		_edges += _test_edge(corners[5], corners[6], raycaster) * 1 << 9
-#		_edges += _test_edge(corners[6], corners[7], raycaster) * 1 << 10
-#		_edges += _test_edge(corners[7], corners[0], raycaster) * 1 << 11
-#
-#		_generate_corners()
+		_assign_edges_to_corners()
+		_assign_neighbours_to_corners()
+		
+		for corner in _corners:
+			corner.first_evaluate_state()
+		
+		for corner in _corners:
+			corner.second_evaluate_state()
+		
 	
 	
 	
-	func _generate_corners() -> void:
-		# i de 0 à 11
-		_corners = 0
-		for i in range(12):
-			if _edges & 1 << i:
-				_corners |= TriangulationTable.Edges[i]
-#		print(_corners, "    ", _edges)
+	
+	func _assign_edges_to_corners() -> void:
+		_corners[0].set_edges([_edges[3], _edges[0], _edges[8]])
+		_corners[1].set_edges([_edges[0], _edges[1], _edges[9]])
+		_corners[2].set_edges([_edges[1], _edges[2], _edges[10]])
+		_corners[3].set_edges([_edges[2], _edges[3], _edges[11]])
+		_corners[4].set_edges([_edges[7], _edges[4], _edges[8]])
+		_corners[5].set_edges([_edges[4], _edges[5], _edges[9]])
+		_corners[6].set_edges([_edges[5], _edges[6], _edges[10]])
+		_corners[7].set_edges([_edges[6], _edges[7], _edges[11]])
+	
+	
+	func _assign_neighbours_to_corners() -> void:
+		_corners[0].set_neighbours([_corners[3], _corners[1], _corners[4]])
+		_corners[1].set_neighbours([_corners[0], _corners[2], _corners[5]])
+		_corners[2].set_neighbours([_corners[1], _corners[3], _corners[6]])
+		_corners[3].set_neighbours([_corners[2], _corners[4], _corners[7]])
+		_corners[4].set_neighbours([_corners[7], _corners[5], _corners[0]])
+		_corners[5].set_neighbours([_corners[4], _corners[6], _corners[1]])
+		_corners[6].set_neighbours([_corners[5], _corners[7], _corners[2]])
+		_corners[7].set_neighbours([_corners[6], _corners[0], _corners[3]])
 	
 	
 	
-	func _test_edge(a: Vector3, b: Vector3, caster: Raycaster) -> int:
-		var collides := caster.collides(b, a)
-		# Testing both ways for single-side collision
-		return 1 if collides else 0
-
+	func _get_corners_index() -> int:
+		var result := 0
+		for i in range(_corners.size()):
+			if _corners[i].is_inside():
+				result |= 1 << i
+		return result
+	
+	
+	
+	class Edge:
+		var _dist_between_corners: float
+		var _corners_cut_dist: Dictionary
+		
+		func _init(raycaster: Raycaster, corner1: Corner, corner2: Corner) -> void:
+			_dist_between_corners = corner1.position.distance_to(corner2.position)
+			var data := raycaster.get_collision_data(corner2.position, corner1.position)
+			var data2 := raycaster.get_collision_data(corner1.position, corner2.position)
+			
+			_corners_cut_dist = {
+				corner1.index: data.collision_length() if data.collides() else -1,
+				corner2.index: data2.collision_length() if data2.collides() else -1
+			}
+		
+		
+		func is_cut() -> bool:
+			for dist in _corners_cut_dist.values():
+				if dist > 0.0:
+					return true
+			return false
+		
+		
+		# TODO: Add small object check
+		func is_inside(index: int) -> bool:
+			if not _corners_cut_dist.has(index):
+				return false
+			if _corners_cut_dist.values()[0] > 0.0 and _corners_cut_dist.values()[1] > 0.0:
+				if _corners_cut_dist.values()[0] + _corners_cut_dist.values()[1] < _dist_between_corners:
+					return false
+			return _corners_cut_dist[index] > 0.0
+	
+	
+	
+	class Corner:
+		enum STATE {NONE, UNKNOWN, INSIDE, OUTSIDE}
+		
+		var index: int
+		var position: Vector3
+		var edges: Array
+		var neighbours: Array
+		var state: int = STATE.NONE
+		
+		func _init(index: int, position: Vector3) -> void:
+			self.index = index
+			self.position = position
+		
+		
+		func set_edges(edges: Array) -> void:
+			self.edges = edges
+		
+		
+		func set_neighbours(neighbours: Array) -> void:
+			self.neighbours = neighbours
+		
+		
+		func first_evaluate_state() -> void:
+			_evaluate_state_first_pass()
+		
+		
+		func second_evaluate_state() -> void:
+			_evaluate_state_second_pass()
+			edges.empty()
+			neighbours.empty()
+		
+		
+		func is_inside() -> bool:
+			return state == STATE.INSIDE
+		
+		
+		func _evaluate_state_first_pass() -> void:
+			for edge in edges:
+				if edge.is_inside(index):
+					state = STATE.INSIDE
+					return
+				if state == STATE.NONE and edge.is_cut():
+					state = STATE.OUTSIDE
+			if state == STATE.NONE:
+				state = STATE.UNKNOWN
+		
+		
+		func _evaluate_state_second_pass() -> void:
+			if state != STATE.UNKNOWN:
+				return
+			for corner in neighbours:
+				if corner.state != STATE.UNKNOWN:
+					state = corner.state
+					return
