@@ -12,7 +12,7 @@ var _drawer: BoxDrawer
 var _markers: MeshInstance
 var _corners: MeshInstance
 onready var _thread: Thread = Thread.new()
-onready var _caster: Raycaster = Raycaster.new(get_world())
+onready var _caster: Pointcaster = Pointcaster.new(get_world())
 
 var _voxels: Array
 
@@ -103,15 +103,6 @@ func _edges_done() -> void:
 	print("Edges done !")
 	_thread.wait_to_finish()
 	
-	var j := 0
-	for x in _voxels:
-		for y in x:
-			for voxel in y:
-				if voxel.collides():
-					j += 1
-	
-	print(j, " voxels are colliding !")
-	
 	print("Generating mesh !")
 	_generate_meshes()
 
@@ -122,8 +113,6 @@ func _generate_meshes() -> void:
 	for x in _voxels:
 		for y in x:
 			for voxel in y:
-				if not voxel.collides():
-					continue
 				vertices.append_array(voxel.get_corresponding_vertices())
 	
 	# Swapping the mesh normals
@@ -137,20 +126,20 @@ func _generate_meshes() -> void:
 	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_markers.mesh = arr_mesh
 	
-	var debug_vertices: PoolVector3Array = []
-	# Generating debug points
-	for x in _voxels:
-		for y in x:
-			for voxel in y:
-				for corner in voxel._corners:
-					debug_vertices.append_array(_generate_point(corner.position, corner.state == 2))
-	
-	var debug_arr_mesh = ArrayMesh.new()
-	var debug_arrays = []
-	debug_arrays.resize(ArrayMesh.ARRAY_MAX)
-	debug_arrays[ArrayMesh.ARRAY_VERTEX] = debug_vertices
-	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, debug_arrays)
-	_corners.mesh = debug_arr_mesh
+#	var debug_vertices: PoolVector3Array = []
+#	# Generating debug points
+#	for x in _voxels:
+#		for y in x:
+#			for voxel in y:
+#				for corner in voxel._corners:
+#					debug_vertices.append_array(_generate_point(corner.position, corner.state == 2))
+#
+#	var debug_arr_mesh = ArrayMesh.new()
+#	var debug_arrays = []
+#	debug_arrays.resize(ArrayMesh.ARRAY_MAX)
+#	debug_arrays[ArrayMesh.ARRAY_VERTEX] = debug_vertices
+#	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, debug_arrays)
+#	_corners.mesh = debug_arr_mesh
 	
 #	var multimesh := MultiMesh.new()
 #	multimesh.transform_format = MultiMesh.TRANSFORM_3D
@@ -189,14 +178,6 @@ class Voxel:
 	func _init(center: Vector3, size: float) -> void:
 		_center = center
 		_size = size
-	
-	
-	
-	func collides() -> bool:
-		for edge in _edges:
-			if edge.is_cut():
-				return true
-		return false
 	
 	
 	
@@ -252,7 +233,7 @@ class Voxel:
 	
 	
 	
-	func test_edges(raycaster: Raycaster) -> void:
+	func test_edges(caster: Pointcaster) -> void:
 		var offset := _size / 2.0
 		_corners = [
 			Corner.new(0, _center + Vector3(-1, -1, -1) * offset),
@@ -265,29 +246,34 @@ class Voxel:
 			Corner.new(7, _center + Vector3(+1, +1, -1) * offset),
 		]
 		
-		_edges = [
-			Edge.new(raycaster, _corners[0],  _corners[1]),
-			Edge.new(raycaster, _corners[1],  _corners[2]),
-			Edge.new(raycaster, _corners[2],  _corners[3]),
-			Edge.new(raycaster, _corners[3],  _corners[0]),
-			Edge.new(raycaster, _corners[4],  _corners[5]),
-			Edge.new(raycaster, _corners[5],  _corners[6]),
-			Edge.new(raycaster, _corners[6],  _corners[7]),
-			Edge.new(raycaster, _corners[7],  _corners[4]),
-			Edge.new(raycaster, _corners[0],  _corners[4]),
-			Edge.new(raycaster, _corners[1],  _corners[5]),
-			Edge.new(raycaster, _corners[2],  _corners[6]),
-			Edge.new(raycaster, _corners[3],  _corners[7]),
-		]
-		
-		_assign_edges_to_corners()
-		_assign_neighbours_to_corners()
-		
 		for corner in _corners:
-			corner.first_evaluate_state()
+			corner.evaluate_state(caster)
 		
-		for corner in _corners:
-			corner.second_evaluate_state()
+		
+#
+#		_edges = [
+#			Edge.new(raycaster, _corners[0],  _corners[1]),
+#			Edge.new(raycaster, _corners[1],  _corners[2]),
+#			Edge.new(raycaster, _corners[2],  _corners[3]),
+#			Edge.new(raycaster, _corners[3],  _corners[0]),
+#			Edge.new(raycaster, _corners[4],  _corners[5]),
+#			Edge.new(raycaster, _corners[5],  _corners[6]),
+#			Edge.new(raycaster, _corners[6],  _corners[7]),
+#			Edge.new(raycaster, _corners[7],  _corners[4]),
+#			Edge.new(raycaster, _corners[0],  _corners[4]),
+#			Edge.new(raycaster, _corners[1],  _corners[5]),
+#			Edge.new(raycaster, _corners[2],  _corners[6]),
+#			Edge.new(raycaster, _corners[3],  _corners[7]),
+#		]
+#
+#		_assign_edges_to_corners()
+#		_assign_neighbours_to_corners()
+#
+#		for corner in _corners:
+#			corner.first_evaluate_state()
+#
+#		for corner in _corners:
+#			corner.second_evaluate_state()
 		
 	
 	
@@ -380,35 +366,39 @@ class Voxel:
 			self.neighbours = neighbours
 		
 		
-		func first_evaluate_state() -> void:
-			_evaluate_state_first_pass()
+#		func first_evaluate_state() -> void:
+#			_evaluate_state_first_pass()
+#
+#
+#		func second_evaluate_state() -> void:
+#			_evaluate_state_second_pass()
+#			edges.empty()
+#			neighbours.empty()
 		
 		
-		func second_evaluate_state() -> void:
-			_evaluate_state_second_pass()
-			edges.empty()
-			neighbours.empty()
+		func evaluate_state(caster: Pointcaster) -> void:
+			state = STATE.INSIDE if caster.is_inside(position) else STATE.OUTSIDE
 		
 		
 		func is_inside() -> bool:
 			return state == STATE.INSIDE
 		
 		
-		func _evaluate_state_first_pass() -> void:
-			for edge in edges:
-				if edge.is_inside(index):
-					state = STATE.INSIDE
-					return
-				if state == STATE.NONE and edge.is_cut():
-					state = STATE.OUTSIDE
-			if state == STATE.NONE:
-				state = STATE.UNKNOWN
-		
-		
-		func _evaluate_state_second_pass() -> void:
-			if state != STATE.UNKNOWN:
-				return
-			for corner in neighbours:
-				if corner.state != STATE.UNKNOWN:
-					state = corner.state
-					return
+#		func _evaluate_state_first_pass() -> void:
+#			for edge in edges:
+#				if edge.is_inside(index):
+#					state = STATE.INSIDE
+#					return
+#				if state == STATE.NONE and edge.is_cut():
+#					state = STATE.OUTSIDE
+#			if state == STATE.NONE:
+#				state = STATE.UNKNOWN
+#
+#
+#		func _evaluate_state_second_pass() -> void:
+#			if state != STATE.UNKNOWN:
+#				return
+#			for corner in neighbours:
+#				if corner.state != STATE.UNKNOWN:
+#					state = corner.state
+#					return
