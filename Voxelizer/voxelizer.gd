@@ -102,20 +102,39 @@ func voxels_done() -> void:
 
 
 func _generate_edges() -> void:
-	var pointcaster := Pointcaster.new(get_world())
-	
 	var i := 0.0
 	var j := 0
+	print("Generating corners")
 	for x in _voxels:
 		print("Progress: ", (i / _voxels.size()) * 100, " %")
 		for y in x:
 			for voxel in y:
-				voxel.test_edges(pointcaster)
+				voxel.generate_corners()
 				j += 1
 		i += 1
 	
-	var raycaster := Raycaster.new(get_world())	
+	print("Evaluating corners")
+	i = 0.0
+	var raycaster := Raycaster.new(get_world())
+	var pointcaster := Pointcaster.new(get_world())
+	for x in _voxels:
+		print("Progress: ", (i / _voxels.size()) * 100, " %")
+		for y in x:
+			for voxel in y:
+				voxel.evaluate_corners(pointcaster, raycaster)
+		i += 1
+	
 	if apply_smoothing:
+		
+		print("Applying smoothing")
+		i = 0.0
+		for x in _voxels:
+			print("Progress: ", (i / _voxels.size()) * 100, " %")
+			for y in x:
+				for voxel in y:
+					voxel.evaluate_smoothing(raycaster)
+			i += 1
+		
 		for x in _voxels:
 			for y in x:
 				for voxel in y:
@@ -144,9 +163,6 @@ func _generate_meshes() -> void:
 			for voxel in y:
 				vertices.append_array(voxel.get_corresponding_vertices())
 	
-	# Swapping the mesh normals
-#	vertices.invert()
-	
 	
 	var arr_mesh = ArrayMesh.new()
 	var arrays = []
@@ -161,7 +177,7 @@ func _generate_meshes() -> void:
 #		for y in x:
 #			for voxel in y:
 #				for corner in voxel._corners:
-#					debug_vertices.append_array(_generate_point(corner.position, corner.state == 2))
+#					debug_vertices.append_array(_generate_point(corner.position, corner.state != 2))
 #
 #	var debug_arr_mesh = ArrayMesh.new()
 #	var debug_arrays = []
@@ -169,18 +185,6 @@ func _generate_meshes() -> void:
 #	debug_arrays[ArrayMesh.ARRAY_VERTEX] = debug_vertices
 #	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, debug_arrays)
 #	_corners.mesh = debug_arr_mesh
-	
-#	var multimesh := MultiMesh.new()
-#	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-#	multimesh.set_instance_count(colliding_voxels.size())
-#	var cube := CubeMesh.new()
-#	cube.size = Vector3.ONE * voxel_size
-#	multimesh.mesh = cube
-#	_markers.multimesh = multimesh
-#
-#	for i in range(colliding_voxels.size()):
-#		print("Progress: ", (float(i) / colliding_voxels.size()) * 100, " %")
-#		_markers.multimesh.set_instance_transform(i, Transform(Basis(), colliding_voxels[i]._center - global_transform.origin))
 
 
 
@@ -246,18 +250,18 @@ class Voxel:
 		
 		# Complex version
 #		var edges: PoolVector3Array = [
-#			_center + Vector3(-1, -1, 0) * offset,
-#			_center + Vector3(0, -1, +1) * offset,
-#			_center + Vector3(+1, -1, 0) * offset,
-#			_center + Vector3(0, -1, -1) * offset,
-#			_center + Vector3(-1, +1, 0) * offset,
-#			_center + Vector3(0, +1, +1) * offset,
-#			_center + Vector3(+1, +1, 0) * offset,
-#			_center + Vector3(0, +1, -1) * offset,
-#			_center + Vector3(-1, 0, -1) * offset,
-#			_center + Vector3(-1, 0, +1) * offset,
-#			_center + Vector3(+1, 0, +1) * offset,
-#			_center + Vector3(+1, 0, -1) * offset,
+#			(_corners[0].position + _corners[1].position) / 2.0,
+#			(_corners[1].position + _corners[2].position) / 2.0,
+#			(_corners[2].position + _corners[3].position) / 2.0,
+#			(_corners[3].position + _corners[0].position) / 2.0,
+#			(_corners[4].position + _corners[5].position) / 2.0,
+#			(_corners[5].position + _corners[6].position) / 2.0,
+#			(_corners[6].position + _corners[7].position) / 2.0,
+#			(_corners[7].position + _corners[4].position) / 2.0,
+#			(_corners[0].position + _corners[4].position) / 2.0,
+#			(_corners[1].position + _corners[5].position) / 2.0,
+#			(_corners[2].position + _corners[6].position) / 2.0,
+#			(_corners[3].position + _corners[7].position) / 2.0,
 #		]
 		
 		for index in TriangulationTable.SMC[_get_corners_index()]:
@@ -274,7 +278,7 @@ class Voxel:
 	
 	
 	
-	func test_edges(pointcaster: Pointcaster) -> void:
+	func generate_corners() -> void:
 		var offset := _size / 2.0
 		var positions := [
 			_center + Vector3(-1, -1, -1) * offset,
@@ -312,45 +316,27 @@ class Voxel:
 				_corners[i] = Corner.new(i, positions[i])
 				_owned_corners.append(_corners[i])
 		
-		
-		for corner in _owned_corners:
-			corner.evaluate_state(pointcaster)
-		
 		_assign_neighbours_to_corners()
-		
-		
-		
-#
-#		_edges = [
-#			Edge.new(raycaster, _corners[0],  _corners[1]),
-#			Edge.new(raycaster, _corners[1],  _corners[2]),
-#			Edge.new(raycaster, _corners[2],  _corners[3]),
-#			Edge.new(raycaster, _corners[3],  _corners[0]),
-#			Edge.new(raycaster, _corners[4],  _corners[5]),
-#			Edge.new(raycaster, _corners[5],  _corners[6]),
-#			Edge.new(raycaster, _corners[6],  _corners[7]),
-#			Edge.new(raycaster, _corners[7],  _corners[4]),
-#			Edge.new(raycaster, _corners[0],  _corners[4]),
-#			Edge.new(raycaster, _corners[1],  _corners[5]),
-#			Edge.new(raycaster, _corners[2],  _corners[6]),
-#			Edge.new(raycaster, _corners[3],  _corners[7]),
-#		]
-#
-#		_assign_edges_to_corners()
-#
-#		for corner in _corners:
-#			corner.first_evaluate_state()
-#
-#		for corner in _corners:
-#			corner.second_evaluate_state()
-		
+	
+	
+	
+	func evaluate_corners(pointcaster: Pointcaster, raycaster: Raycaster) -> void:
+		for corner in _corners:
+			# If the corner is not inside a mesh, then we check if he is next to a surface
+			if not corner.evaluate_inside(pointcaster):
+				corner.evaluate_edges(raycaster)
+	
+	
+	
+	func evaluate_smoothing(raycaster: Raycaster) -> void:
+		for corner in _owned_corners:
+			corner.evaluate_intersection(raycaster)
 	
 	
 	
 	func apply_smoothing(raycaster: Raycaster) -> void:
 		for corner in _owned_corners:
-			corner.evaluate_intersection(raycaster)
-			
+			corner.apply_position_smoothing()
 	
 	
 	
@@ -381,7 +367,7 @@ class Voxel:
 	func _get_corners_index() -> int:
 		var result := 0
 		for i in range(_corners.size()):
-			if _corners[i].is_inside():
+			if not _corners[i].is_outside():
 				result |= 1 << i
 		return result
 	
@@ -397,8 +383,8 @@ class Voxel:
 			var data2 := raycaster.get_collision_data(corner1.position, corner2.position)
 			
 			_corners_cut_dist = {
-				corner1.index: data.collision_length() if data.collides() else -1,
-				corner2.index: data2.collision_length() if data2.collides() else -1
+				corner1: data.collision_length() if data.collides() else -1,
+				corner2: data2.collision_length() if data2.collides() else -1
 			}
 		
 		
@@ -409,77 +395,108 @@ class Voxel:
 			return false
 		
 		
-		# TODO: Add small object check
-		func is_inside(index: int) -> bool:
-			if not _corners_cut_dist.has(index):
+		
+		func is_surface(corner: Corner) -> bool:
+			return is_cut()
+			if not _corners_cut_dist.has(corner):
 				return false
-			if _corners_cut_dist.values()[0] > 0.0 and _corners_cut_dist.values()[1] > 0.0:
-				if _corners_cut_dist.values()[0] + _corners_cut_dist.values()[1] < _dist_between_corners:
-					return false
-			return _corners_cut_dist[index] > 0.0
+			return _corners_cut_dist[corner] > 0.0
+		
+		
+		
+		func get_other(corner: Corner) -> Corner:
+			for c in _corners_cut_dist.keys():
+				if c != corner:
+					return c
+			return null
 	
 	
 	
 	class Corner:
-		enum STATE {NONE, UNKNOWN, INSIDE, OUTSIDE}
+		enum STATE {SURFACE, INSIDE, OUTSIDE}
 		
 		var index: int
 		var position: Vector3
-		var edges: Array
+		var offseted_position: Vector3
+		var edges := [null, null, null, null, null, null]
 		var neighbours := [null, null, null, null, null, null]
-		var state: int = STATE.NONE
+		var state: int = STATE.OUTSIDE
+		
 		
 		func _init(index: int, position: Vector3) -> void:
 			self.index = index
 			self.position = position
 		
 		
-		func set_edges(edges: Array) -> void:
-			self.edges = edges
-		
 		
 		func set_neighbours(neighbours: Array) -> void:
 			for i in range(neighbours.size()):
 				if neighbours[i]:
 					self.neighbours[i] = neighbours[i]
+		
+		
+		
+		func evaluate_inside(caster: Pointcaster) -> bool:
+			if caster.is_inside(position):
+				state = STATE.INSIDE
+				return true
+			return false
+		
+		
+		
+		func evaluate_edges(caster: Raycaster) -> void:
+			var edges_list := [2, 3, 0, 1, 5, 4]
+			for i in range(neighbours.size()):
+				if not neighbours[i]:
+					continue
+				if neighbours[i].edges[edges_list[i]]:
+					edges[i] = neighbours[i].edges[edges_list[i]]
+				else:
+					edges[i] = Edge.new(caster, self, neighbours[i])
 			
-			
+			for edge in edges:
+				if not edge:
+					continue
+				if edge.is_surface(self):
+					state = STATE.SURFACE
+					return
 		
-		
-#		func first_evaluate_state() -> void:
-#			_evaluate_state_first_pass()
-#
-#
-#		func second_evaluate_state() -> void:
-#			_evaluate_state_second_pass()
-#			edges.empty()
-#			neighbours.empty()
-		
-		
-		func evaluate_state(caster: Pointcaster) -> void:
-			state = STATE.INSIDE if caster.is_inside(position) else STATE.OUTSIDE
 		
 		
 		func evaluate_intersection(caster: Raycaster) -> void:
-			if state != STATE.INSIDE:
+			offseted_position = position
+			if state != STATE.SURFACE:
 				return
 			var offset := Vector3.ZERO
-			for neighbour in neighbours:
-				if not neighbour:
+			for edge in edges:
+				if not edge:
 					continue
-				if neighbour.state == STATE.OUTSIDE:
-					offset += neighbour.position - position
+				if edge.is_cut():
+					offset += edge.get_other(self).position - position
+			var data := caster.get_collision_data(position, position + offset)
 			
-			var dist := position.distance_to(neighbours[0].position)
-			var data := caster.get_collision_data(position + offset, position)
+			# Forward pass
 			if data.collides():
-				position = data.collision_position()
-			
-			
+				offseted_position = data.collision_position()
+			else:
+				# Backward pass
+				data = caster.get_collision_data(position + offset, position)
+				if data.collides():
+					offseted_position = data.collision_position()
 		
 		
-		func is_inside() -> bool:
-			return state == STATE.INSIDE
+		# Applying the offseted position after all the voxels were processed to prevent
+		# cast not colliding for other corners
+		func apply_position_smoothing() -> void:
+			position = offseted_position
+		
+		
+		
+		func is_outside() -> bool:
+			return state == STATE.OUTSIDE
+		
+		
+		
 		
 		
 #		func _evaluate_state_first_pass() -> void:

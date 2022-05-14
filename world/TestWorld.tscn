@@ -1253,7 +1253,7 @@ transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.001, 0.001, 0.001 )
 [node name="Geometry" type="Spatial" parent="."]
 
 [node name="Floor" parent="Geometry" instance=ExtResource( 1 )]
-transform = Transform( 100, 0, 0, 0, 0.1, 0, 0, 0, 100, 0.868181, -0.0464903, -0.221966 )
+transform = Transform( 100, 0, 0, 0, 5, 0, 0, 0, 100, 0.868181, -5.08869, -0.221966 )
 mesh = SubResource( 4 )
 skeleton = NodePath("../..")
 
@@ -1402,7 +1402,7 @@ mesh = SubResource( 96 )
 skeleton = NodePath("../../..")
 
 [node name="Block22" parent="." instance=ExtResource( 1 )]
-transform = Transform( 2.00001, 0, 0, 0, 1.41421, -1.41422, 0, 1.41421, 1.41422, -26.8386, 6.0661, 13.9292 )
+transform = Transform( 2.00001, 0, 0, 0, 0, -2.00001, 0, 1.99999, 0, -27.1529, 6.24963, 15.9331 )
 visible = false
 mesh = SubResource( 96 )
 
@@ -1414,18 +1414,24 @@ transform = Transform( 0.892979, 0.101771, 0.438442, -0.444396, 0.353917, 0.8229
 shadow_enabled = true
 
 [node name="Old_snag" parent="." instance=ExtResource( 5 )]
-transform = Transform( 10, 0, 0, 0, 10, 0, 0, 0, 10, -15.1525, 3.39182, 17.6272 )
+transform = Transform( 10, 0, 0, 0, 10, 0, 0, 0, 10, -33.1975, 3.39182, 17.6272 )
 
 [node name="StaticBody" type="StaticBody" parent="."]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -31.0411, 5.21889, 17.6725 )
-visible = false
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -17.705, 5.21889, 14.9145 )
 collision_layer = 3
 collision_mask = 3
 
 [node name="CollisionShape" type="CollisionShape" parent="StaticBody"]
 shape = SubResource( 97 )
 
-[node name="Voxelizer" type="Spatial" parent="."]
+[node name="VoxelizerWorld" type="Spatial" parent="."]
 script = ExtResource( 3 )
-voxelization_box = AABB( -21.87, 0.779, 9.737, 10, 10, 10 )
-voxel_size = 0.5
+voxelization_box = AABB( -121.82, -17.952, -121.472, 250, 40, 250 )
+voxel_size = 5.0
+apply_smoothing = true
+
+[node name="VoxelizerStump" type="Spatial" parent="."]
+script = ExtResource( 3 )
+voxelization_box = AABB( -23.166, 0.9, 8.175, 10, 10, 15 )
+voxel_size = 0.501
+apply_smoothing = true
